@@ -1,0 +1,14 @@
+.git
+docker-compose.yml
+docker-compose.override.yml
+.github
+.vscode
+.pytest_cache
+.dockerignore
+.coverage
+venv
+.venv
+Dockerfile*
+.DS_Store
+**/__pycache__/ 
+.mypy_cache
