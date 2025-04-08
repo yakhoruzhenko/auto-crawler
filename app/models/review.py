@@ -3,14 +3,14 @@ from enum import StrEnum
 
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.infra.engine import Base
+from app.models.base import Base
 
 
 class EnumValueMixin:
     @classmethod
     def get_name_by_value(cls, value: str) -> str:
         """Return the member name by the provided value."""
-        return next((name for name, member in cls.__members__.items() if member.value == value), None)
+        return next((name for name, member in cls.__members__.items() if member.value == value), None)  # type: ignore
 
 
 class Characteristic(EnumValueMixin, StrEnum):

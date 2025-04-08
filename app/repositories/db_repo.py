@@ -12,7 +12,7 @@ from app.repositories import Repository
 
 
 class DBRepository(Repository):
-    async def store_reviews_with_override(self, cur_reviews: list[dict[str, Any]]):
+    async def store_reviews_with_override(self, cur_reviews: list[dict[str, Any]]) -> None:
         reviews = []
         async with get_session() as session:
             for review in cur_reviews:
@@ -37,7 +37,7 @@ class DBRepository(Repository):
             await session.commit()
 
     async def store_reviews(self, cur_reviews: list[dict[str, Any]]) -> None:
-        reviews = []
+        db_reviews: list[Review] = []
         async with get_session() as session:
             for review in cur_reviews:
                 drive_type = DriveType.get_name_by_value(review['drive_type'])
@@ -61,21 +61,21 @@ class DBRepository(Repository):
                     cons_text=cons_text,
                     date=review['date']
                 )
-                reviews.append(new_review)
-            session.add_all(reviews)
+                db_reviews.append(new_review)
+            session.add_all(db_reviews)
             try:
                 await session.commit()
             except IntegrityError as e:
                 if 'duplicate key value violates unique constraint' in e.args[0]:
                     await session.rollback()
                     failed = []
-                    for review in reviews:
+                    for db_review in db_reviews:
                         try:
-                            session.add(review)
+                            session.add(db_review)
                             await session.commit()
                         except IntegrityError:
                             await session.rollback()
-                            failed.append(review)
+                            failed.append(db_review)
                     if failed:
                         msg = f"Duplicate reviews found: {len(failed)}. Signaling crawler to stop."
                         raise ReviewAlreadyExists(msg)

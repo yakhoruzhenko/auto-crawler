@@ -1,0 +1,7 @@
+mypy==1.15.0
+isort==6.0.1
+flake8==7.2.0
+bandit==1.8.3
+yamllint==1.37.0
+pytest==8.3.5
+types-aiofiles==24.1.0.20250326

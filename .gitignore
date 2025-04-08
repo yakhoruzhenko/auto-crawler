@@ -170,3 +170,5 @@ data/*
 # Custom
 full_auto.html
 auto.html
+app/static/page
+app/static/reviews

@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.infra.engine import DATABASE_URL, Base
+from app.infra.engine import DATABASE_URL
 from app.models import *
+from app.models.base import Base
 
 # Alembic Config
 config = context.config

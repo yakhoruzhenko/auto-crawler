@@ -4,3 +4,4 @@ sqlalchemy==2.0.38
 asyncpg==0.30.0
 alembic==1.15.2
 aiohttp==3.11.16
+aiofiles==24.1.0

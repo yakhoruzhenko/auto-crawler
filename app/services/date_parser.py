@@ -22,7 +22,7 @@ months = {
 }
 
 
-def parse_relative_date(date_string: str) -> datetime.date:
+def parse_relative_date(date_string: str) -> datetime.date | None:
     now = datetime.datetime.now()
 
     if "сьогодні" in date_string:

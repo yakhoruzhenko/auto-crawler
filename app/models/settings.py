@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.infra.engine import Base
+from app.models.base import Base
 
 
 class Settings(Base):

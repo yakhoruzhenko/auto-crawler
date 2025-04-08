@@ -5,7 +5,6 @@ from typing import Any, Type
 from urllib.parse import urljoin
 
 import aiohttp
-from bs4 import BeautifulSoup
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.exceptions import ReviewAlreadyExists
@@ -13,8 +12,8 @@ from app.repositories import Repository
 from app.repositories.db_repo import DBRepository
 from app.repositories.file_repo import FileRepository  # noqa: F401
 from app.services.date_parser import parse_relative_date
+from app.services.html_parser import BeautifulSoupParser, Element, HTMLParser
 from app.services.logging import setup_logging  # noqa: F401
-from app.services.parser import HTMLParser
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +40,13 @@ class AutoReviewCrawler:
     }
 
     def __init__(self, parser_class: Type[HTMLParser], repo_class: Type[Repository]):
-        self._parser_class = parser_class
-        self._repo = repo_class()
-        self._parser_features = 'html.parser'
-        self._pages_to_crawl = None
-        self._current_page = None
-        self._should_parse_full_review = None
-        self.total_reviews_scrapped = 0
+        self._parser_class: Type[HTMLParser] = parser_class
+        self._repo: Repository = repo_class()
+        self._parser_features: str = 'html.parser'
+        self._pages_to_crawl: int | None = None
+        self._current_page: int | None = None
+        self._should_parse_full_review: bool | None = None
+        self.total_reviews_scrapped: int = 0
 
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
@@ -64,12 +63,14 @@ class AutoReviewCrawler:
                     raise ValueError(f"Failed to fetch {url}. Status: {response.status}")
                 return await response.text()
 
-    def _parse_short_review(self, article: str, review_data: dict[str, Any], html_parser: HTMLParser) -> None:
+    def _parse_short_review(self, article: Element, review_data: dict[str, Any], html_parser: HTMLParser) -> None:
         # Extract car name, year and link
         car_card_tag = article.find('a', class_='reviews-cars_name-link')
-        car_name_year = car_card_tag.text.strip()
-        review_data['name'], review_data['year'] = car_name_year[:-5], int(car_name_year[-4:])
-        review_data['link'] = car_card_tag['href'].lstrip('/')
+        car_name_year = car_card_tag.text.strip() if car_card_tag else None
+        if car_name_year:
+            review_data['name'], review_data['year'] = car_name_year[:-5], int(car_name_year[-4:])
+        if car_card_tag:
+            review_data['link'] = car_card_tag['href'].lstrip('/')
 
         # Extract review text
         review_text_tag = article.find('p', class_='reviews-car-card_desc-i reviews-cars_desc-cont',
@@ -134,7 +135,7 @@ class AutoReviewCrawler:
     def _parse_full_review(self, html: str, review_data: dict[str, Any], html_parser: HTMLParser) -> None:
         raise NotImplementedError("Parsing full reviews is not implemented yet")
 
-    def _extract_reviews(self, html: str) -> list[dict]:
+    def _extract_reviews(self, html: str) -> list[dict[str, Any]]:
         """Extracts review data from the given page HTML."""
         html_parser = self._parser_class(html, self._parser_features)
         reviews = []
@@ -214,9 +215,9 @@ class AutoReviewCrawler:
 
 # TODO: refactor to run multiple async tasks splitting the pages span equally if possible
 # TODO: create a celery task that runs once a day
-async def main():
+async def main() -> None:
     # await asyncio.sleep(300)
-    crawler = AutoReviewCrawler(parser_class=BeautifulSoup, repo_class=DBRepository)
+    crawler = AutoReviewCrawler(parser_class=BeautifulSoupParser, repo_class=DBRepository)
     await crawler.crawl(pages_to_crawl=10)
     # await crawler.crawl()
     print(f"Total reviews scraped: {crawler.total_reviews_scrapped}")
