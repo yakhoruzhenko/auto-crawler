@@ -45,8 +45,8 @@ class HTMLParser(ABC):
 
 
 class BeautifulSoupParser(HTMLParser):
-    def __init__(self, markup: str, features: str | Sequence[str], *args: Any, **kwargs: Any):
-        self._soup = BeautifulSoup(markup, features, *args, **kwargs)
+    def __init__(self, content: str, features: str | Sequence[str] = 'html.parser', *args: Any, **kwargs: Any):
+        self._soup = BeautifulSoup(content, features, *args, **kwargs)
 
     def find(self, name: str, *args: Any, **kwargs: Any) -> Any:
         return self._soup.find(name, *args, **kwargs)

@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 import aiohttp
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from app.exceptions import ReviewAlreadyExists
+from app.exceptions import FailedToFetchView, ReviewAlreadyExists
 from app.repositories import Repository
 from app.repositories.db_repo import DBRepository
 from app.repositories.file_repo import FileRepository  # noqa: F401
@@ -38,29 +38,83 @@ class AutoReviewCrawler:
         "Ціна": "Price",
         "Дизайн": "Styling"
     }
+    MIN_MAX_SLEEP_TIME = (1, 3)
 
     def __init__(self, parser_class: Type[HTMLParser], repo_class: Type[Repository]):
         self._parser_class: Type[HTMLParser] = parser_class
         self._repo: Repository = repo_class()
-        self._parser_features: str = 'html.parser'
-        self._pages_to_crawl: int | None = None
-        self._current_page: int | None = None
         self._should_parse_full_review: bool | None = None
         self.total_reviews_scrapped: int = 0
+
+    async def _get_total_pages(self) -> int:
+        html = await self._fetch_view(self.BASE_URL)
+        parser = self._parser_class(html)
+        try:
+            last_page = max(
+                int(a.text.strip()) for a in parser.select(".page-link") if a.text.strip().isdigit()
+            )
+            return last_page
+        except Exception as e:
+            logging.error("Could not determine total pages")
+            raise e
+
+    @staticmethod
+    def round_robin_split(pages_to_crawl: list[int], workers: int) -> list[list[int]]:
+        buckets: list[list[int]] = [[] for _ in range(workers)]
+        for i, item in enumerate(pages_to_crawl):
+            buckets[i % workers].append(item)
+        return buckets
+
+    async def prepare_pages(self, total_pages_to_crawl: int, workers: int) -> list[list[int]]:
+        total_pages = await self._get_total_pages()
+        stored_total_pages = await self._repo.get_total_pages()
+        if not stored_total_pages:
+            stored_total_pages = total_pages
+            await self._repo.store_total_pages(stored_total_pages)
+        if total_pages_to_crawl > total_pages:
+            total_pages_to_crawl = total_pages
+        if delta := total_pages - stored_total_pages:
+            await self._repo.store_total_pages(total_pages)
+            visited_pages = set(await self._repo.adjust_visited_pages(delta))
+        else:
+            visited_pages = set(await self._repo.get_visited_pages())
+        if visited_pages:
+            max_visited_page = min(total_pages, max(visited_pages))
+        else:
+            max_visited_page = 0
+        start_page = max_visited_page + 1
+        pages_range = set(range(1, start_page))
+        missing_pages = list(pages_range - visited_pages)
+        if max_visited_page == total_pages and len(missing_pages) == 0:
+            logging.info("No pages left to parse. Finishing")
+            return []
+        elif len(missing_pages) > total_pages_to_crawl:
+            pages_to_crawl = missing_pages[:total_pages_to_crawl]
+        elif len(missing_pages) == total_pages_to_crawl:
+            pages_to_crawl = missing_pages
+        else:
+            extra_pages_count = total_pages_to_crawl - len(missing_pages)
+            extra_pages = list(range(start_page, start_page + extra_pages_count))
+            missing_pages.extend(extra_pages)
+            pages_to_crawl = missing_pages
+        logging.info(f"Preparing to crawl {len(pages_to_crawl)} pages")
+        return self.round_robin_split(pages_to_crawl, workers)
 
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type(ValueError),
+        retry=retry_if_exception_type(FailedToFetchView),
         reraise=True
     )
     async def _fetch_view(self, url: str) -> str:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=self.HEADERS) as response:
-                if response.status != 200:
+                if response.status == 404:
+                    return ''
+                elif response.status != 200:
                     # logging.warning(f"Response code: {response.status}. Response: {await response.text()}")
                     logging.warning(f"Response code: {response.status}.")
-                    raise ValueError(f"Failed to fetch {url}. Status: {response.status}")
+                    raise FailedToFetchView(f"Failed to fetch {url}. Status: {response.status}")
                 return await response.text()
 
     def _parse_short_review(self, article: Element, review_data: dict[str, Any], html_parser: HTMLParser) -> None:
@@ -123,7 +177,7 @@ class AutoReviewCrawler:
                                 class_='reviews-car-card_author-date reviews-car-card_author-i')
         date = parse_relative_date(date_tag.text.strip()) if date_tag else None
         if not date:
-            logger.warning(f"Date tag: {date_tag} can not be converted to date")
+            logging.warning(f"Date tag: {date_tag} can not be converted to date")
         review_data['date'] = date
 
         if self._should_parse_full_review:
@@ -137,7 +191,7 @@ class AutoReviewCrawler:
 
     def _extract_reviews(self, html: str) -> list[dict[str, Any]]:
         """Extracts review data from the given page HTML."""
-        html_parser = self._parser_class(html, self._parser_features)
+        html_parser = self._parser_class(html)
         reviews = []
         try:
             for article in html_parser.find_all('article', class_='reviews-car-card_i'):
@@ -147,80 +201,69 @@ class AutoReviewCrawler:
                 self._parse_short_review(article, review_data, html_parser)
                 reviews.append(review_data)
 
-        except AttributeError:
-            logging.warning("Skipping a review due to missing fields")
+        except Exception as e:
+            logging.warning(f"Skipping a review due to the failed parsing. Error: {e}")
+            # logging.warning(f"Skipping a review due to the failed parsing. Error: {e}" +
+            #                 f"\nCar tag: {article.find('a', class_='reviews-cars_name-link')}.")
 
         return reviews
 
-    async def _get_last_page(self) -> int:
-        """Fetches the first page to determine the total number of review pages."""
-        html = await self._fetch_view(self.BASE_URL)
-        parser = self._parser_class(html, self._parser_features)
-
-        try:
-            last_page = max(
-                int(a.text.strip()) for a in parser.select(".page-link") if a.text.strip().isdigit()
-            )
-            pages_to_crawl = None
-            if self._pages_to_crawl:
-                pages_to_crawl = self._pages_to_crawl
-                if self._current_page:
-                    pages_to_crawl += self._current_page
-
-            return min(last_page, pages_to_crawl) if pages_to_crawl else last_page
-        except Exception:
-            logging.error("Could not determine total pages, defaulting to 1")
-            return 1
-
-    async def crawl(self, start_page: int | None = None, pages_to_crawl: int | None = None,
-                    should_parse_full_review: bool | None = False) -> None:
-        """Starts the crawling process, iterating through review pages."""
-        self._should_parse_full_review = should_parse_full_review
-        self._current_page = await self._repo.get_page_number()
-        self._pages_to_crawl = pages_to_crawl
-        last_page = await self._get_last_page()
-        if not start_page:
-            start_page = self._current_page
-
-        for page in range(start_page + 1, last_page + 1):
+    async def crawl(self, pages_to_crawl: list[int], no_sleep: bool | None = False, worker_id: int | None = 1) -> None:
+        for page in pages_to_crawl:
             url = urljoin(self.BASE_URL, self.PAGE_PARAM.format(page))
-            logging.info(f"Fetching page {page} / {last_page}: {url}")
-            html = await self._fetch_view(url)
+            logging.info(f"Worker {worker_id} -- Fetching page {page}: {url}")
             try:
+                html = await self._fetch_view(url)
                 reviews = self._extract_reviews(html)
-            except TypeError as e:
-                logging.error(f"Failed to parse the page: {e}")
-                return
+            except FailedToFetchView as e:
+                logging.error(f"Worker {worker_id} -- Failed to fetch the page: {e}")
+                continue
+            except (ValueError, TypeError) as e:
+                logging.error(f"Worker {worker_id} -- Failed to parse the page: {e}")
             if not reviews:
-                logging.warning(f"No reviews found at the page: {page}. Exiting")
-                return
+                logging.warning(f"Worker {worker_id} -- No reviews found at the page: {page}")
 
             # Store page and reviews
-            self._current_page = page
             self.total_reviews_scrapped += len(reviews)
             try:
                 await self._repo.store_reviews(reviews)
-            except ReviewAlreadyExists:
-                await self._repo.store_page_number(0)
-                logging.info("Resetting the start page to 0")
-                return
+            except ReviewAlreadyExists as e:
+                logging.info(f"Worker {worker_id} -- {e}")
 
-            await self._repo.store_page_number(self._current_page)
+            await self._repo.store_visited_page(page)
+
+            if no_sleep:
+                continue
 
             # Randomized sleep to avoid detection
-            sleep_time = random.uniform(2, 4)
-            logging.info(f"Sleeping for {sleep_time:.2f} seconds")
+            sleep_time = random.uniform(*self.MIN_MAX_SLEEP_TIME)
+            logging.info(f"Worker {worker_id} -- Sleeping for {sleep_time:.2f} seconds")
             await asyncio.sleep(sleep_time)
 
 
-# TODO: refactor to run multiple async tasks splitting the pages span equally if possible
 # TODO: create a celery task that runs once a day
-async def main() -> None:
+async def main(total_pages_to_crawl: int | None = None,
+               workers: int | None = None,
+               no_sleep: bool | None = None) -> None:
+    if not workers or workers < 1:
+        workers = 1
+    if not total_pages_to_crawl or total_pages_to_crawl < 1:
+        total_pages_to_crawl = 1
+    if no_sleep is None:
+        no_sleep = False
     # await asyncio.sleep(300)
     crawler = AutoReviewCrawler(parser_class=BeautifulSoupParser, repo_class=DBRepository)
-    await crawler.crawl(pages_to_crawl=10)
-    # await crawler.crawl()
+    pages_per_worker = await crawler.prepare_pages(total_pages_to_crawl, workers)
+    await asyncio.gather(*[crawler.crawl(
+        pages_to_crawl=pages,
+        no_sleep=no_sleep,
+        worker_id=i + 1
+    ) for i, pages in enumerate(pages_per_worker)])
     print(f"Total reviews scraped: {crawler.total_reviews_scrapped}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(
+        total_pages_to_crawl=3,
+        workers=1,
+        no_sleep=True,
+    ))

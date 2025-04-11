@@ -23,17 +23,17 @@ class FileRepository(Repository):
         async with aiofiles.open(self._reviews_path, 'a+') as f:
             await f.write(f'{cur_reviews},\n')
 
-    async def store_page_number(self, page_number: int) -> None:
-        async with aiofiles.open(self._page_path, 'w') as f:
-            await f.write(str(page_number))
+    # async def store_page_number(self, page_number: int) -> None:
+    #     async with aiofiles.open(self._page_path, 'w') as f:
+    #         await f.write(str(page_number))
 
-    async def get_page_number(self) -> int:
-        try:
-            async with aiofiles.open(self._page_path, 'r') as f:
-                content = await f.read()
-                current_page = int(content)
-        except (FileNotFoundError, ValueError):
-            logging.debug("No last_page file found or it's corrupted, creating the new")
-            current_page = 0
-            await self.store_page_number(current_page)
-        return current_page
+    # async def get_page_number(self) -> int:
+    #     try:
+    #         async with aiofiles.open(self._page_path, 'r') as f:
+    #             content = await f.read()
+    #             current_page = int(content)
+    #     except (FileNotFoundError, ValueError):
+    #         logging.debug("No last_page file found or it's corrupted, creating the new")
+    #         current_page = 0
+    #         await self.store_page_number(current_page)
+    #     return current_page

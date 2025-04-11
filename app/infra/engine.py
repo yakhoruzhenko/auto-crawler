@@ -33,7 +33,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
     except Exception as e:
         await session.rollback()
-        logger.error(f'DB ERROR: {e}')
+        logging.error(f'DB ERROR: {e}')
         raise e
     finally:
         await session.close()

@@ -60,7 +60,7 @@ def parse_relative_date(date_string: str) -> datetime.date | None:
                             logging.warning(f"Invalid day {day} for month {month_en}. Falling back to {day - 1}...")
                             day -= 1
                         else:
-                            return None
-
+                            break
+    logging.warning(f"Invalid date string: {date_string}")
     # If none of the patterns matched, return None
     return None
