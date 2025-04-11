@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+import time
 from typing import Any, Type
 from urllib.parse import urljoin
 
@@ -241,29 +242,33 @@ class AutoReviewCrawler:
             await asyncio.sleep(sleep_time)
 
 
-# TODO: create a celery task that runs once a day
 async def main(total_pages_to_crawl: int | None = None,
                workers: int | None = None,
                no_sleep: bool | None = None) -> None:
-    if not workers or workers < 1:
-        workers = 1
-    if not total_pages_to_crawl or total_pages_to_crawl < 1:
-        total_pages_to_crawl = 1
-    if no_sleep is None:
-        no_sleep = False
-    # await asyncio.sleep(300)
-    crawler = AutoReviewCrawler(parser_class=BeautifulSoupParser, repo_class=DBRepository)
-    pages_per_worker = await crawler.prepare_pages(total_pages_to_crawl, workers)
-    await asyncio.gather(*[crawler.crawl(
-        pages_to_crawl=pages,
-        no_sleep=no_sleep,
-        worker_id=i + 1
-    ) for i, pages in enumerate(pages_per_worker)])
-    print(f"Total reviews scraped: {crawler.total_reviews_scrapped}")
+    try:
+        if not workers or workers < 1:
+            workers = 1
+        if not total_pages_to_crawl or total_pages_to_crawl < 1:
+            total_pages_to_crawl = 1
+        if no_sleep is None:
+            no_sleep = False
+        crawler = AutoReviewCrawler(parser_class=BeautifulSoupParser, repo_class=DBRepository)
+        pages_per_worker = await crawler.prepare_pages(total_pages_to_crawl, workers)
+        await asyncio.gather(*[crawler.crawl(
+            pages_to_crawl=pages,
+            no_sleep=no_sleep,
+            worker_id=i + 1
+        ) for i, pages in enumerate(pages_per_worker)])
+        print(f"Total reviews scraped: {crawler.total_reviews_scrapped}")
+    except Exception as e:
+        logging.exception(e)
 
 if __name__ == "__main__":
-    asyncio.run(main(
-        total_pages_to_crawl=3,
-        workers=1,
-        no_sleep=True,
-    ))
+    SLEEP_TIME = 60 * 60 * 24
+    while True:
+        asyncio.run(main(
+            total_pages_to_crawl=1,
+            workers=1,
+            no_sleep=True,
+        ))
+        time.sleep(SLEEP_TIME)

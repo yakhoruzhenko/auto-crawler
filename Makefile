@@ -2,7 +2,7 @@ buid: ## build
 	docker compose build crawler
 
 up: ## up
-	docker compose up -d crawler
+	docker compose up crawler
 
 clean: ## clean
 	rm -rf .pytest_cache

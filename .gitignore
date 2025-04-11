@@ -166,6 +166,7 @@ venv/
 
 # PostgreSQL
 data/*
+*.sql
 
 # Custom
 full_auto.html

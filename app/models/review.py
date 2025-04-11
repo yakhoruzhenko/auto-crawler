@@ -46,7 +46,7 @@ class Review(Base):
     review_text: Mapped[str] = mapped_column()
     total_rating: Mapped[float] = mapped_column()
     rating_components: Mapped[dict[str, int]] = mapped_column()
-    mileage: Mapped[int] = mapped_column(nullable=True)
+    mileage: Mapped[int] = mapped_column(nullable=True)  # thousands km
     fuel_consumption: Mapped[float] = mapped_column(nullable=True)
     drive_type: Mapped[str] = mapped_column(nullable=True)
     pros: Mapped[list[str]] = mapped_column(nullable=True)
