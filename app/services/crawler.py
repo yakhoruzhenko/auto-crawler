@@ -236,7 +236,7 @@ class AutoReviewCrawler:
                 continue
 
             # Randomized sleep to avoid detection
-            sleep_time = random.uniform(*self.MIN_MAX_SLEEP_TIME)
+            sleep_time = random.uniform(*self.MIN_MAX_SLEEP_TIME)  # nosec
             logging.info(f"Worker {worker_id} -- Sleeping for {sleep_time:.2f} seconds")
             await asyncio.sleep(sleep_time)
 
