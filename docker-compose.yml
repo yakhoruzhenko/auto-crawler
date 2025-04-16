@@ -16,8 +16,8 @@ services:
       # DB connectivity
       PGHOST: "postgres"
       PGPORT: 5432
-      PGDATABASE: "auto_crawler"
-      PGUSER: "crawler"
+      PGDATABASE: "reviews_db"
+      PGUSER: "reviewer"
       PGPASSWORD: "password"
     volumes:
       - ${PWD}/app:/app/app
@@ -26,11 +26,11 @@ services:
     entrypoint: ["/app/entrypoint.sh"]
     command: ["python", "-m", "app.services.crawler"]
 
-  crawler-dev:
+  review-app-dev:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: auto-crawler-dev
+    container_name: review-app-dev
     volumes:
       - ${PWD}/app:/app/app
       - /setup.cfg
@@ -41,12 +41,12 @@ services:
     container_name: postgres
     image: postgres:17
     environment:
-      POSTGRES_DB: "auto_crawler"
-      POSTGRES_USER: "crawler"
+      POSTGRES_DB: "reviews_db"
+      POSTGRES_USER: "reviewer"
       POSTGRES_PASSWORD: "password"
       # PGUSER and PGDATABASE are environment variables used by psql itself, hence required for the healcheck test
-      PGUSER: "crawler"
-      PGDATABASE: "auto_crawler"
+      PGUSER: "reviewer"
+      PGDATABASE: "reviews_db"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 60s

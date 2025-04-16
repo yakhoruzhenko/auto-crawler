@@ -1,2 +1,2 @@
-from .review import Review
+from .review import Review, ReviewParsed
 from .settings import Settings

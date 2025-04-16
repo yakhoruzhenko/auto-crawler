@@ -2,7 +2,7 @@ import datetime
 import logging
 import re
 
-from app.services.logging import setup_logging  # noqa: F401
+from app.services.logger import setup_logging  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

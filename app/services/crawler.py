@@ -10,11 +10,11 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from app.exceptions import FailedToFetchView, ReviewAlreadyExists
 from app.repositories import Repository
-from app.repositories.db_repo import DBRepository
-from app.repositories.file_repo import FileRepository  # noqa: F401
+from app.repositories.db.crawler import CrawlerRepository
+from app.repositories.file.crawler import FileRepository  # noqa: F401
 from app.services.date_parser import parse_relative_date
 from app.services.html_parser import BeautifulSoupParser, Element, HTMLParser
-from app.services.logging import setup_logging  # noqa: F401
+from app.services.logger import setup_logging  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +252,7 @@ async def main(total_pages_to_crawl: int | None = None,
             total_pages_to_crawl = 1
         if no_sleep is None:
             no_sleep = False
-        crawler = AutoReviewCrawler(parser_class=BeautifulSoupParser, repo_class=DBRepository)
+        crawler = AutoReviewCrawler(parser_class=BeautifulSoupParser, repo_class=CrawlerRepository)
         pages_per_worker = await crawler.prepare_pages(total_pages_to_crawl, workers)
         await asyncio.gather(*[crawler.crawl(
             pages_to_crawl=pages,

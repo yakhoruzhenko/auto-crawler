@@ -16,14 +16,14 @@ down-v: ## down and remove all existing volumes
 	docker compose down -v
 
 lint: ## lint
-	docker compose run --rm crawler-dev sh -c " \
+	docker compose run --rm review-app-dev sh -c " \
 		flake8 . && \
 		isort --check --diff . && \
 		mypy ." && \
 		yamllint .
 
 sec: ## runs security tests
-	docker compose run --rm crawler-dev bandit -r .
+	docker compose run --rm review-app-dev bandit -r .
 
 checks: lint sec ## run all static checks
 	

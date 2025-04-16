@@ -7,3 +7,5 @@ bandit==1.8.3
 yamllint==1.37.0
 pytest==8.3.5
 types-aiofiles==24.1.0.20250326
+pandas-stubs==2.2.3.250308
+types-seaborn==0.13.2.20250111

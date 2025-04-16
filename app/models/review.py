@@ -1,6 +1,8 @@
 from datetime import date as dt_date
 from enum import StrEnum
+from uuid import UUID
 
+from sqlalchemy import text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -42,6 +44,26 @@ class Review(Base):
 
     link: Mapped[str] = mapped_column(primary_key=True)  # there are "duplicated" reviews for the different links
     name: Mapped[str] = mapped_column()
+    year: Mapped[int] = mapped_column()
+    review_text: Mapped[str] = mapped_column()
+    total_rating: Mapped[float] = mapped_column()
+    rating_components: Mapped[dict[str, int]] = mapped_column()
+    mileage: Mapped[int] = mapped_column(nullable=True)  # thousands km
+    fuel_consumption: Mapped[float] = mapped_column(nullable=True)
+    drive_type: Mapped[str] = mapped_column(nullable=True)
+    pros: Mapped[list[str]] = mapped_column(nullable=True)
+    pros_text: Mapped[str] = mapped_column(nullable=True)
+    cons: Mapped[list[str]] = mapped_column(nullable=True)
+    cons_text: Mapped[str] = mapped_column(nullable=True)
+    date: Mapped[dt_date] = mapped_column()
+
+
+class ReviewParsed(Base):
+    __tablename__ = 'reviews_parsed'
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, server_default=text('uuid_generate_v4()'))
+    brand: Mapped[str] = mapped_column()
+    model: Mapped[str] = mapped_column()
     year: Mapped[int] = mapped_column()
     review_text: Mapped[str] = mapped_column()
     total_rating: Mapped[float] = mapped_column()

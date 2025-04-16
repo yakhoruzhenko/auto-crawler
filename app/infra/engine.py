@@ -10,11 +10,11 @@ logger = logging.getLogger(__name__)
 
 def get_db_url() -> str:
     return 'postgresql+asyncpg://%s:%s@%s:%s/%s' % (
-        os.getenv('PGUSER', 'postgres'),
+        os.getenv('PGUSER', 'reviewer'),
         os.getenv('PGPASSWORD', 'password'),
         os.getenv('PGHOST', 'localhost'),
-        os.getenv('PGPORT', '5432'),
-        os.getenv('PGDATABASE', 'postgres'),
+        os.getenv('PGPORT', '5788'),
+        os.getenv('PGDATABASE', 'reviews_db'),
     )
 
 

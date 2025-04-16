@@ -11,7 +11,7 @@ from app.models.settings import Settings
 from app.repositories import Repository
 
 
-class DBRepository(Repository):
+class CrawlerRepository(Repository):
     async def store_reviews_with_override(self, cur_reviews: list[dict[str, Any]]) -> None:
         reviews = []
         async with get_session() as session:
